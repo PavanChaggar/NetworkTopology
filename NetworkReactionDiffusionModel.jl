@@ -4,8 +4,17 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : missing
+        el
+    end
+end
+
 # ╔═╡ 3c0cf6a8-6476-11eb-09d1-999ee7b2b2a7
-using DifferentialEquations, LightGraphs, PlutoUI, Random, Plots
+using DifferentialEquations, LightGraphs, PlutoUI, Random, Plots, StatsPlots
 
 # ╔═╡ c80d981e-6483-11eb-0fe1-c177d735e7c1
 using Turing, Distributions, MCMCChains
@@ -43,8 +52,8 @@ NetworkDiffusion(u, p, t) = -p * L * u
 # intial concentration for protein set as a 1,5 vector with random entries between 0,1
 u0 = [0.9,0.1,0.1,0.1,0.1];
 
-# ╔═╡ 09bb90ba-6483-11eb-238c-6b4240ca8374
-p = 1.0;
+# ╔═╡ 25a78c46-64b7-11eb-20b9-f3f7946a71fd
+@bind p Slider(0.0:0.25:5.0, default=1.0, show_value=true)
 
 # ╔═╡ 20fc52a2-6483-11eb-26c1-695ca621c6b9
 problem = ODEProblem(NetworkDiffusion, eltype(p).(u0), (0.0,2.0), p);
@@ -81,6 +90,9 @@ model = fit(data, NetworkDiffusion);
 # ╔═╡ ee2a090e-6483-11eb-2de9-05fac790ac70
 chain = sample(model, NUTS(0.65), 1000)
 
+# ╔═╡ 802f0488-64ba-11eb-21ea-2d3fdefb438e
+plot(chain)
+
 # ╔═╡ Cell order:
 # ╟─af2bd910-6476-11eb-370f-b3fa8bbbe1ea
 # ╠═3c0cf6a8-6476-11eb-09d1-999ee7b2b2a7
@@ -90,7 +102,6 @@ chain = sample(model, NUTS(0.65), 1000)
 # ╠═41c66bc0-647a-11eb-3d82-839abf75159d
 # ╠═57fc2dd8-647a-11eb-0ee1-1f8c31cd939c
 # ╠═da3b96c8-647a-11eb-067d-4d3b966a912a
-# ╠═09bb90ba-6483-11eb-238c-6b4240ca8374
 # ╠═20fc52a2-6483-11eb-26c1-695ca621c6b9
 # ╠═3d071e36-647c-11eb-1cf6-f5556a8e8f6a
 # ╠═3d174390-649a-11eb-1d75-2ffc2dcb1a21
@@ -99,3 +110,5 @@ chain = sample(model, NUTS(0.65), 1000)
 # ╠═5c0782c2-6483-11eb-302a-576fad5f79cc
 # ╠═d921d762-6483-11eb-2d46-275d428e13ca
 # ╠═ee2a090e-6483-11eb-2de9-05fac790ac70
+# ╠═25a78c46-64b7-11eb-20b9-f3f7946a71fd
+# ╠═802f0488-64ba-11eb-21ea-2d3fdefb438e
