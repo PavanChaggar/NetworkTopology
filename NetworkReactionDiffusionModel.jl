@@ -5,10 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 3c0cf6a8-6476-11eb-09d1-999ee7b2b2a7
-using DifferentialEquations, LightGraphs, PlutoUI
-
-# ╔═╡ c2658902-6478-11eb-242d-a1145ee35ff1
-using Plots
+using DifferentialEquations, LightGraphs, PlutoUI, Random, Plots
 
 # ╔═╡ c80d981e-6483-11eb-0fe1-c177d735e7c1
 using Turing, Distributions, MCMCChains
@@ -23,6 +20,9 @@ This notebook demonstrates how to use Julia to construct ODE models for the simu
 In particular, we will focus on a pure diffusion model and a FKPP model. 
 
 """
+
+# ╔═╡ 72047f28-64a6-11eb-22e5-a9110360f74f
+Random.seed!(1)
 
 # ╔═╡ f5e54040-6481-11eb-01b0-9d79e87d998f
 md"""
@@ -84,7 +84,7 @@ chain = sample(model, NUTS(0.65), 1000)
 # ╔═╡ Cell order:
 # ╟─af2bd910-6476-11eb-370f-b3fa8bbbe1ea
 # ╠═3c0cf6a8-6476-11eb-09d1-999ee7b2b2a7
-# ╠═c2658902-6478-11eb-242d-a1145ee35ff1
+# ╠═72047f28-64a6-11eb-22e5-a9110360f74f
 # ╟─f5e54040-6481-11eb-01b0-9d79e87d998f
 # ╠═a79abb08-6476-11eb-05cb-8f91beb6062b
 # ╠═41c66bc0-647a-11eb-3d82-839abf75159d
