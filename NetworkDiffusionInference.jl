@@ -20,7 +20,7 @@ Random.seed!(1)
 plotly()
 
 # ╔═╡ 2b35a7c4-64be-11eb-2785-03c7cab059fe
-n = 50
+n = 100
 
 # ╔═╡ 5c626174-64bf-11eb-22b0-b3509b9899e3
 p = 0.7
@@ -81,6 +81,9 @@ histogram(samples[2,:])
 # ╔═╡ 61a86fee-64be-11eb-0d9f-1d57f870b70b
 histogram(samples[1,:])
 
+# ╔═╡ a312fd94-656f-11eb-1a0d-45c5a48872ea
+q.dist.m
+
 # ╔═╡ Cell order:
 # ╠═105b4cf4-64bb-11eb-07ef-2127bbaa69d9
 # ╠═474bf842-64bb-11eb-3678-93fd8b1e9aa5
@@ -99,3 +102,4 @@ histogram(samples[1,:])
 # ╠═ea970ade-64bb-11eb-3975-6b73229f2779
 # ╠═3cf0f646-64bc-11eb-0a91-974808128e23
 # ╠═61a86fee-64be-11eb-0d9f-1d57f870b70b
+# ╠═a312fd94-656f-11eb-1a0d-45c5a48872ea

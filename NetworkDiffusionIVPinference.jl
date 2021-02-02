@@ -23,7 +23,7 @@ plotly()
 n = 5
 
 # ╔═╡ 5c626174-64bf-11eb-22b0-b3509b9899e3
-p = 0.7
+p = 1.0
 
 # ╔═╡ 401c3fcc-64be-11eb-3b48-cfb9749db66a
 begin 
@@ -38,7 +38,7 @@ NetworkDiffusion(u, p, t) = -p * L * u
 u0 = rand(n);
 
 # ╔═╡ 086dcd3e-64be-11eb-0b13-c7371c6b367f
- ρ = 0.5
+ ρ = 3
 
 # ╔═╡ 6fca1080-64bb-11eb-37c0-77b51e264c31
 begin 
@@ -87,6 +87,15 @@ histogram(samples[2,:])
 # ╔═╡ 61a86fee-64be-11eb-0d9f-1d57f870b70b
 histogram(samples[1,:])
 
+# ╔═╡ cdc4040e-656d-11eb-06e9-ddc3136cd3fe
+histogram(samples[3,:])
+
+# ╔═╡ 81380840-656f-11eb-0e3b-6dd7f35ba9f8
+(mean(samples; dims = 2)..., )
+
+# ╔═╡ 48fca63c-6571-11eb-2484-7533ede544d0
+q.transform
+
 # ╔═╡ Cell order:
 # ╠═105b4cf4-64bb-11eb-07ef-2127bbaa69d9
 # ╠═474bf842-64bb-11eb-3678-93fd8b1e9aa5
@@ -105,3 +114,6 @@ histogram(samples[1,:])
 # ╠═ea970ade-64bb-11eb-3975-6b73229f2779
 # ╠═3cf0f646-64bc-11eb-0a91-974808128e23
 # ╠═61a86fee-64be-11eb-0d9f-1d57f870b70b
+# ╠═cdc4040e-656d-11eb-06e9-ddc3136cd3fe
+# ╠═81380840-656f-11eb-0e3b-6dd7f35ba9f8
+# ╠═48fca63c-6571-11eb-2484-7533ede544d0
