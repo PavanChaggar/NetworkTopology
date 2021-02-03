@@ -20,10 +20,10 @@ Random.seed!(1)
 plotly()
 
 # ╔═╡ 2b35a7c4-64be-11eb-2785-03c7cab059fe
-n = 100
+n = 50
 
 # ╔═╡ 5c626174-64bf-11eb-22b0-b3509b9899e3
-p = 0.7
+p = 1.0
 
 # ╔═╡ 401c3fcc-64be-11eb-3b48-cfb9749db66a
 begin 
@@ -38,11 +38,11 @@ NetworkDiffusion(u, p, t) = -p * L * u
 u0 = rand(n);
 
 # ╔═╡ 086dcd3e-64be-11eb-0b13-c7371c6b367f
- ρ = 0.5
+ ρ = 3.0
 
 # ╔═╡ 6fca1080-64bb-11eb-37c0-77b51e264c31
 begin 
-	problem = ODEProblem(NetworkDiffusion, eltype(p).(u0), (0.0,1.0), ρ);
+	problem = ODEProblem(NetworkDiffusion, eltype(ρ).(u0), (0.0,1.0), ρ);
 	sol = solve(problem, Tsit5(), saveat=0.005);
 	data = Array(sol);
 end
@@ -57,7 +57,7 @@ begin
 		σ ~ InverseGamma(2, 3) # ~ is the tilde character
 		ρ ~ truncated(Normal(5,10.0),0.0,10)
 
-		#prob = remake(problem, p=p)
+		#prob = remake(problem, ρ=ρ)
 		prob = ODEProblem(func,eltype(ρ).(u0),(0.0,1.0),ρ)
 		predicted = solve(prob, Tsit5(),saveat=0.005)
 
@@ -81,9 +81,6 @@ histogram(samples[2,:])
 # ╔═╡ 61a86fee-64be-11eb-0d9f-1d57f870b70b
 histogram(samples[1,:])
 
-# ╔═╡ a312fd94-656f-11eb-1a0d-45c5a48872ea
-q.dist.m
-
 # ╔═╡ Cell order:
 # ╠═105b4cf4-64bb-11eb-07ef-2127bbaa69d9
 # ╠═474bf842-64bb-11eb-3678-93fd8b1e9aa5
@@ -102,4 +99,3 @@ q.dist.m
 # ╠═ea970ade-64bb-11eb-3975-6b73229f2779
 # ╠═3cf0f646-64bc-11eb-0a91-974808128e23
 # ╠═61a86fee-64be-11eb-0d9f-1d57f870b70b
-# ╠═a312fd94-656f-11eb-1a0d-45c5a48872ea
