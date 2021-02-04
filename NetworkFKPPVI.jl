@@ -3,10 +3,14 @@ using Turing: Variational
 using Plots
 using StatsPlots
 using LinearAlgebra
+#=
+This solved for initial values of FKPP model on network using forward diff and 
+advi. 
+=#
 
 Random.seed!(1)
 
-const N = 5
+const N = 10
 const P = 1.0
 
 G = erdos_renyi(N, P)
@@ -27,34 +31,24 @@ sol = solve(problem, AutoTsit5(Rosenbrock23()), saveat=0.005)
 
 plot(sol)
 
-data = Array(sol)
+const data = Array(sol)
 
 Turing.setadbackend(:forwarddiff)
-@model function fit(data, func)
+@model function fit(data, func, ::Type{T} = Float64) where {T}
     σ ~ InverseGamma(2, 3)
     k ~ truncated(Normal(5,10.0),0.0,10)
     a ~ truncated(Normal(5,10.0),0.0,10)
 
-    #uN = MvNormal(0.5 * ones(5), ones(5))
-
-    u1 ~ truncated(Normal(0.5,2.0),0.0,1.0)
-    u2 ~ truncated(Normal(0.5,2.0),0.0,1.0)
-    u3 ~ truncated(Normal(0.5,2.0),0.0,1.0)
-    u4 ~ truncated(Normal(0.5,2.0),0.0,1.0)
-    u5 ~ truncated(Normal(0.5,2.0),0.0,1.0)
+    u ~ filldist(truncated(Normal(0.5,2.0),0.0,1.0), N)
 
     p = [k, a] 
 
-    u = [u1, u2, u3, u4, u5]
-
     prob = remake(problem, u0=u, p=p)
-    #prob = ODEProblem(func, u, (0.0,2.0), p)
 
     predicted = solve(prob, AutoTsit5(Rosenbrock23()), saveat=0.005)
 
-
     for i ∈ 1:length(predicted)
-        data[:,i] ~ MvNormal(predicted[i], σ)
+        data[:,i] ~ MvNormal(predicted[i], σ) 
     end 
 end 
 
