@@ -18,18 +18,18 @@ function NetworkFKPP(u, p, t)
 end
 
 u0 = rand(N)
-p = [2.0, 3.0]
+p = [2, 3.0]
 t_span = (0.0, 2.0)
 
 problem = ODEProblem(NetworkFKPP, u0, t_span, p)
-sol = solve(problem, AutoTsit5(Rosenbrock23()), saveat=0.05)
+sol = solve(problem, Tsit5(), saveat=0.05)
 
 plot(sol)
 
 data = Array(sol)
 
 Turing.setadbackend(:forwarddiff)
-@model function fit(data, func)
+@model function fit(data, problem)
     σ ~ InverseGamma(2, 3)
     k ~ truncated(Normal(5,10.0),0.0,10)
     a ~ truncated(Normal(5,10.0),0.0,10)
@@ -41,7 +41,7 @@ Turing.setadbackend(:forwarddiff)
     prob = remake(problem, u0=u, p=p)
     #prob = ODEProblem(func, u, (0.0,2.0), p)
 
-    predicted = solve(prob, AutoTsit5(Rosenbrock23()), saveat=0.05)
+    predicted = solve(prob, Tsit5(), saveat=0.05)
 
 
     for i ∈ 1:length(predicted)
@@ -49,12 +49,12 @@ Turing.setadbackend(:forwarddiff)
     end 
 end 
 
-model = fit(data, NetworkFKPP)
+model = fit(data, problem)
 #advi = ADVI(10, 1000)
 #opt = Variational.DecayedADAGrad(1e-3, 1.1, 0.9)
 #q = vi(model, advi; optimizer = opt)
 
-nuts = sample(model, NUTS(.65), 10_000)
+nuts = sample(model, NUTS(.65), 1_000)
 
 plot(nuts)
 #samples = rand(q, 10000)
