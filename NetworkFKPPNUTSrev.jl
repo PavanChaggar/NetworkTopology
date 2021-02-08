@@ -4,6 +4,7 @@ using Plots
 using StatsPlots
 using ReverseDiff
 using DiffEqSensitivity
+using Zygote
 
 Random.seed!(1)
 
@@ -30,7 +31,7 @@ plot(sol)
 
 data = Array(sol)
 
-Turing.setadbackend(:forwarddiff)
+Turing.setadbackend(:reversediff)
 @model function fit(data, problem)
     σ ~ InverseGamma(2, 3)
     k ~ truncated(Normal(5,10.0),0.0,10)
@@ -40,6 +41,7 @@ Turing.setadbackend(:forwarddiff)
     p = [k, a] 
 
     prob = remake(problem, u0=u, p=p)
+    #prob = ODEProblem(func, u, (0.0,2.0), p)
 
     predicted = solve(prob, Tsit5(), saveat=0.05)
 
