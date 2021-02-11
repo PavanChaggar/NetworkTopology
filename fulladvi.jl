@@ -77,7 +77,7 @@ base_dist = Turing.DistributionsAD.TuringDiagMvNormal(zeros(d), ones(d))
 
 to_constrained = inv(bijector(model));
 
-advi = ADVI(10, 5_000)
+advi = ADVI(10, 10_000)
 q_full_normal = vi(model, advi, getq, randn(d^2 + d); optimizer = Variational.DecayedADAGrad(1e-2));
 
 A = q_full_normal.transform.ts[1].a

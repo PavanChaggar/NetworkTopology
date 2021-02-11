@@ -104,7 +104,7 @@ q_mf_normal = vi(m, advi, getq, randn(2 * d));
 d = 13
 
 function getq(θ)
-    print(size(θ))
+    #length \theta = d^2 + d 
     offset = 0
     L = LowerTriangular(reshape(@inbounds(θ[offset + 1: offset + d^2]), (d, d)))
     offset += d^2
@@ -127,3 +127,7 @@ q_full_normal = vi(m, advi, getq, randn(d^2 + d); optimizer = Variational.Decaye
 A = q_full_normal.transform.ts[1].a
 
 heatmap(cov(A * A'))
+
+θ =randn(d^2 + d) 
+offset = 0
+L = LowerTriangular(reshape(@inbounds(θ[offset + 1: offset + d^2]), (d, d)))
