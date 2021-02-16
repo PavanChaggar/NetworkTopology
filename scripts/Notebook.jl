@@ -1,54 +1,64 @@
-using DifferentialEquations, LightGraphs, Random, Turing
-using Turing: Variational
-using Plots
-using StatsPlots
+using Random
+using DifferentialEquations
+using Turing 
+using LightGraphs
+using Base.Threads
 Turing.setadbackend(:forwarddiff)
-
 Random.seed!(1)
 
-function graph_laplacian(N::Int64, P::Float64)
-    L = laplacian_matrix(erdos_renyi(N, P))
+function make_graph(N::Int64, P::Float64)
+    G = erdos_renyi(N, P)
+    L = laplacian_matrix(G)
+    A = adjacency_matrix(G)
+    return L, A
 end
 
-function makeFKPP(L, u=nothing, p=nothing, t=nothing)
-    function ode(u, p, t)
-        κ, α = p 
-        du = -κ * L * u .+ α .* u .* (1 .- u)
-    end 
-    return ode
+function NetworkDiffusion(u, p, t)
+    du = -p * L * u
 end
 
-function simulate(func, u0, t_span, p)
-    problem = ODEProblem(func, u0, t_span, p)
-    sol = solve(problem, Tsit5(), saveat=0.05)
-    data = Array(sol)
-    return data, problem
-end
+@model function fitode(data, problem)
+    u_n = size(data)[1]
+    σ ~ InverseGamma(2, 3) # ~ is the tilde character
+    ρ ~ truncated(Normal(5,10.0),0.0,10)
+    u ~ filldist(truncated(Normal(0.5,2.0),0.0,1.0), u_n)
 
-@model function fit(data, problem)
-    σ ~ InverseGamma(2, 3)
-    k ~ truncated(Normal(5,10.0),0.0,10)
-    a ~ truncated(Normal(5,10.0),0.0,10)
-    u ~ filldist(truncated(Normal(0.5,2.0),0.0,1.0), size(data)[1])
+    prob = remake(problem, u0=u, p=ρ)
+    predicted = solve(prob, Tsit5(),saveat=0.05)
 
-    prob = remake(problem, u0=u, p=[k, a])
-
-    predicted = solve(prob, Tsit5(), saveat=0.05)
-
-    for i ∈ 1:length(predicted)
+    @threads for i = 1:length(predicted)
         data[:,i] ~ MvNormal(predicted[i], σ)
-    end 
-end 
+    end
+end
 
-N = 5
-L = graph_laplacian(N, 0.7)
-u0 = rand(N)
-p = [2.0, 3.0]
-t_span = (0.0, 2.0)
+L, A = make_graph(5,0.5)
 
-func = makeFKPP(L)
+u0 = rand(5)
+p = 2
 
-data, prob = simulate(func, u0, t_span, p) 
-model =  fit(data, prob)
+problem = ODEProblem(NetworkDiffusion, u0, (0.0,1.0), p);
+data = Array(solve(problem, AutoTsit5(Rosenbrock23()), saveat=0.05))
 
-nuts = sample(model, NUTS(.65), 1_000)
+model = fitode(data,problem)
+chain = sample(model, NUTS(0.65), MCMCThreads(), 1_00, 10, progress=true)
+
+L, A = make_graph(10, 0.5)
+
+problem = ODEProblem(NetworkDiffusion, rand(10), (0.0,1.0), p);
+data = Array(solve(problem, AutoTsit5(Rosenbrock23()), saveat=0.05))
+
+model = fitode(data,problem)
+chain = sample(model, NUTS(0.65), 1_000)
+
+L, A = make_graph(50, 0.5)
+
+problem = ODEProblem(NetworkDiffusion, rand(50), (0.0,1.0), p);
+data = Array(solve(problem, AutoTsit5(Rosenbrock23()), saveat=0.05))
+
+model = fitode(data,problem)
+chain = sample(model, NUTS(0.65), 1_000)
+
+using Turing: Variational
+
+advi = ADVI(10, 1000)
+q = vi(model, advi)
