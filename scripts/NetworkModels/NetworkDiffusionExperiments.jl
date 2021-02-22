@@ -30,6 +30,7 @@ end
     @threads for i = 1:length(predicted)
         data[:,i] ~ MvNormal(predicted[i], σ)
     end
+    return ρ, u
 end
 
 L, A = make_graph(5,0.5)
@@ -49,8 +50,20 @@ plot(chain)
 
 pl = scatter(sol.t, data');
 chain_array = Array(chain)
-for k in 1:300 
-    resol = solve(remake(problem,p=chain_array[rand(1:3000), 1:4]),Tsit5(),saveat=0.1)
+for k in 1:300
+    par = chain_array[rand(1:10_000), 1:7]
+    resol = solve(remake(problem,u0=par[1:5], p=par[6]),AutoTsit5(Rosenbrock23()),saveat=0.1)
     plot!(resol, alpha=0.1, color = "#BBBBBB", legend = false)
 end
-plot!(sol1, w=1, legend = false)
+plot!(sol, w=1, legend = false)
+
+
+prior_chain = sample(model, Prior(), 10_000)
+
+chain_array = Array(prior_chain)
+for k in 1:300
+    par = chain_array[rand(1:10_000), 1:7]
+    resol = solve(remake(problem,u0=par[1:5], p=par[6]),AutoTsit5(Rosenbrock23()),saveat=0.1)
+    plot!(resol, alpha=0.1, color = "#BBBBBB", legend = false)
+end
+plot!(sol, w=1, legend = false)
