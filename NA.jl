@@ -1,4 +1,4 @@
-using DifferentialEquations, LightGraphs, Plots
+using OrdinaryDiffEq, LightGraphs, Plots
 using SimpleWeightedGraphs
 using LinearAlgebra
 using Turing
@@ -15,7 +15,7 @@ end
 
 L = laplacian_matrix(GW) 
 
-heatmap(Matrix(adjacency_matrix(GW)))
+heatmap(Array(adjacency_matrix(GW)))
 
 function NetworkAtrophy(du, u, p, t; L=L)
     n = Int(length(u0)/2)
@@ -73,8 +73,23 @@ chain_array = Array(prior_chain)
 plot(Array(sol)[2,:], w=1, legend = false)
 for k in 1:500
     par = chain_array[rand(1:10_000), 1:23]
-    resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.05)
+    resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.1)
     plot!(Array(resol)[2,:], alpha=0.5, color = "#BBBBBB", legend = false)
 end
 scatter!(data[2,:], legend = false)
 
+model = NetworkAtrophy(data,prob)
+
+chain = sample(model, NUTS(0.65), 1000)
+
+chain_array = Array(chain)
+
+avg = mean(chain_array, dims=1)
+
+plot(Array(sol)[3,:], w=1, legend = false)
+for k in 1:100
+    par = chain_array[rand(1:1_000), 1:23]
+    resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.1)
+    plot!(Array(resol)[3,:], alpha=0.5, color = "#BBBBBB", legend = false)
+end
+scatter!(data[3,:], legend = false)
