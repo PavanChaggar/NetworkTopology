@@ -1,12 +1,13 @@
 include("../Models/Models.jl")
 gr()
 
-N = 83 
+ N = 83
 
 # Make a simple weighted random graph and graph Laplacian
 GW = MakeSimpleWeightedGraph(N,0.1)
 L = laplacian_matrix(GW)
 
+heatmap(Array(L))
 # Set up ODE problem
 p = [0.1, 2.0, 1.0]
 
