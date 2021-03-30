@@ -1,7 +1,6 @@
-using DifferentialEquations, LightGraphs, Plots
+using DifferentialEquations, LightGraphs, Plots, Turing
 using SimpleWeightedGraphs
 using LinearAlgebra
-using Turing
 using Base.Threads
 Turing.setadbackend(:forwarddiff)
 
@@ -26,6 +25,7 @@ GW = MakeSimpleWeightedGraph(10,0.5)
 L = laplacian_matrix(GW)
 
 heatmap(Array(adjacency_matrix(GW)))
+heatmap(Array(L))
 
 function NetworkAtrophy(du, u, p, t; L=L)
     n = Int(length(u)/2)
@@ -49,11 +49,14 @@ t_span = (0.0,10.0)
 prob = ODEProblem(NetworkAtrophy, u0, t_span, p)
 
 sol = solve(prob, Tsit5(), saveat=0.1)
-data = Array(sol)
+#data = Array(sol)
+data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0)
 
 plot(sol, vars=(1:10))
-scatter(data')
+scatter!(0:0.1:10,data[1:10,:]')
+
 plot(sol, vars=(11:20))
+scatter!(0:0.1:10,data[11:20,:]')
 
 @model function NetworkAtrophy(data, problem)
     σ ~ InverseGamma(2, 3)
@@ -76,6 +79,7 @@ plot(sol, vars=(11:20))
 end
 
 
+# Prior predictive model
 prior_chain = sample(NetworkAtrophy(data,prob), Prior(), 10_000)
 
 chain_array = Array(prior_chain)
@@ -88,7 +92,10 @@ for k in 1:500
 end
 scatter!(data[10,:], legend = false)
 
+# Posterior sampling
 model = NetworkAtrophy(data,prob)
+
+#chain = sample(model, NUTS(0.65), MCMCThreads(), 1_000, 10, progress=true)
 
 chain = sample(model, NUTS(0.65), 1_000)
 
@@ -96,7 +103,7 @@ chain_array = Array(chain)
 
 avg = mean(chain_array, dims=1)
 
-noden = 10
+noden = 5
 plot(Array(sol)[noden,:], w=1, legend = false)
 for k in 1:100
     par = chain_array[rand(1:500), 1:23]
@@ -107,3 +114,15 @@ scatter!(data[noden,:], legend = false)
 
 using StatsPlots, MCMCChains
 plot(chain)
+
+function plot_predictive(chain_array, sol, data, node::Int)
+    plot(Array(sol)[node,:], w=2, legend = false)
+    for k in 1:100
+        par = chain_array[rand(1:500), 1:23]
+        resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.1)
+        plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
+    end
+    scatter!(data[node,:], legend = false)
+end
+
+plot_predictive(chain_array, sol, data, 10)

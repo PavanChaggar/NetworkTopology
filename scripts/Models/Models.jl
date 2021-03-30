@@ -14,11 +14,11 @@ function MakeSimpleWeightedGraph(n::Int64, p::Float64)
     return GW
 end
 
-function NetworkAtrophy(du, u, p, t; L=L)
-    n = Int(length(u)/2)
+function NetworkAtrophy(du, u0, p, t; L=L)
+    n = Int(length(u0)/2)
 
-    x = u[1:n]
-    y = u[n+1:2n]
+    x = u0[1:n]
+    y = u0[n+1:2n]
 
     ρ, α, β = p
 
@@ -32,7 +32,7 @@ end
     a ~ truncated(Normal(0, 2), 0, Inf)
     b ~ truncated(Normal(0, 2), 0, Inf)
 
-    u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 20)
+    u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 166)
 
     p = [r, a, b]
 
@@ -46,12 +46,12 @@ end
     return r, a, b, u
 end
 
-function plot_predictive(chain, sol, data, node)
+function plot_predictive(chain_array, prob, sol, data, node::Int)
     plot(Array(sol)[node,:], w=2, legend = false)
-    for k in 1:500
-        par = chain[rand(1:10_000), 1:8]
-        resol = solve(remake(problem,u0=par[3:7], p=par[1:2]),AutoTsit5(Rosenbrock23()),saveat=0.05)
+    for k in 1:300
+        par = chain_array[rand(1:1_000), 1:23]
+        resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
         plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
     end
-    return scatter!(data[node,:], legend = false)
+    scatter!(data[node,:], legend = false)
 end
