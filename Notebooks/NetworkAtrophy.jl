@@ -4,6 +4,15 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : missing
+        el
+    end
+end
+
 # ╔═╡ dadc259e-9214-11eb-2b38-33b4cdb9e26b
 begin
 	using DelimitedFiles
@@ -12,15 +21,18 @@ begin
 	using PlutoUI
 	using SimpleWeightedGraphs
 	using LightGraphs
+	using DifferentialEquations
+	using Turing
+	using Plots
+	using PlutoUI
+	using Base.Threads
+	Turing.setadbackend(:forwarddiff)
 end;
-
-# ╔═╡ 8bc35944-920c-11eb-1db3-052983e3b30b
-include("/home/chaggar/Projects/NetworkTopology/scripts/Models/Models.jl");
 
 # ╔═╡ b442e1b4-920c-11eb-0a77-411787683d43
 md"# Network FKPP & Atrophy
 
-Here, we will look at performing inference on a coupled network model of protein diffusion giveb by FKPP dynamics and strutural ROI atrophy given by logistic growth. 
+Here, we will look at performing inference on a coupled network model of protein diffusion giveb by FKPP dynamics and strutural ROI atrophy given as a functiono protein concentration. 
 Where as before we considered random networks, here we will consider networks produced using tractography."
 
 # ╔═╡ 04360dc6-920e-11eb-3450-ff37ab783adc
@@ -65,7 +77,29 @@ begin
 		
 		return mean(M, dims=3)[:,:]
 	end
+	
+	function diffusive_weight(An, Al)
+		A = An ./ Al.^2
+		[A[i,i] = 0.0 for i in 1:size(A)[1]]
+		return A
+	end	
+	
+	laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
+	
+	function plot_predictive(chain_array, prob, sol, data, node::Int)
+		plot(Array(sol)[node,:], w=2, legend = false)
+		for k in 1:300
+			par = chain_array[rand(1:1_000), 1:23]
+			resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
+			plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
+		end
+		scatter!(data[node,:], legend = false)
+	end
+ 
+md"##### Some functions are hidden here"
 end
+
+
 
 # ╔═╡ f92933dc-9211-11eb-091c-11c31d59df21
 csv_path = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/all_subjects"
@@ -82,25 +116,102 @@ An = mean_connectome(subjects, subject_dir, 100, 83, length=false);
 # ╔═╡ 1e560938-9216-11eb-15fa-4d0e02bff32d
 Al = mean_connectome(subjects, subject_dir, 100, 83, length=true);
 
-# ╔═╡ 75684bec-9215-11eb-2c7a-1be0d062b441
-function diffusive_weight(An, Al)
-	A = An ./ Al.^2
-	[A[i,i] = 0 for i in 1:size(A)[1]]
-	return A
-end	
-
 # ╔═╡ 7c9b1dfe-9217-11eb-068b-d17b2a1192aa
-A = diffusive_weight(An, Al)
+A = diffusive_weight(An, Al);
 
 # ╔═╡ a79f01a8-9217-11eb-2466-79e51dd4fd98
-L = laplacian_matrix(SimpleWeightedGraph(A));
+const L = laplacian_matrix(A);
 
 # ╔═╡ 05e312f6-9216-11eb-2a63-31aa25bbdd62
-md"Now we have an adjacency matrix and a Laplacian matrix!"
+md"Now we have an adjacency matrix and a Laplacian matrix and can start to run simulations on networks!"
+
+# ╔═╡ 262a69b8-921d-11eb-30dd-b3f8bcbabeef
+md"## Network Atrophy Model 
+
+The model we'll be working with is the network atrophy model, given by the coupled ODEs: 
+
+$\frac{d\mathbf{p}_i}{dt} = -\rho \sum\limits_{j=1}^{N}\mathbf{L}_{ij}^{\omega}\mathbf{p}_j + \alpha \mathbf{p}_i\left(1-\mathbf{p}_i\right)$ 
+
+$\frac{d\mathbf{a}_i}{dt} = \beta \mathbf{p}_i (1 - \mathbf{a}_i)$ 
+
+where $p$ is the toxic protein vector and $\mathbf{a}$ is the atrophy level vector."
+
+# ╔═╡ 06f74d20-921f-11eb-3911-e774241dcbd5
+function NetworkAtrophyODE(du, u0, p, t; L=L)
+    n = Int(length(u0)/2)
+
+    x = u0[1:n]
+    y = u0[n+1:2n]
+
+    α, β, ρ = p
+
+    du[1:n] .= -ρ * L * x .+ α .* x .* (1.0 .- x)
+    du[n+1:2n] .= β * x .* (1.0 .- y)
+end
+
+# ╔═╡ 537c2a70-9220-11eb-1991-079d887c9277
+md"""
+ρ = $(@bind ρ Slider(0.001:0.001:0.1, show_value=true, default=0.1))
+
+α = $(@bind α Slider(0.1:0.1:3, show_value=true, default=1.0))
+
+β = $(@bind β Slider(0.1:0.1:3, show_value=true, default=1.0))
+
+tf = $(@bind tf Slider(1:1:20, show_value=true, default=10.0))
+"""
+
+# ╔═╡ 5ef83788-9228-11eb-32fe-8b092a2e7f90
+log(ρ/α)
+
+# ╔═╡ 60eb89f0-921e-11eb-2978-1f90d4769c1f
+begin 
+	p = [α, β, ρ]
+	protein = zeros(83)
+	protein[[27,68]] .= 0.1;
+	u0 = [protein; zeros(83)];
+	t_span = (0.0,tf);
+	
+	prob = ODEProblem(NetworkAtrophyODE, u0, t_span, p)
+	sol = solve(prob, Tsit5(), saveat=tf/20)
+end;
+
+# ╔═╡ 20b51026-921f-11eb-2fd0-8f7b3dbd8069
+plot(sol, vars=(1:83), legend=false)
+
+# ╔═╡ 31212946-9223-11eb-0593-87378deb5fc4
+md"## Inference
+
+Now that we have the ODE set up and we can write a probablist model for this using Turing to perform inference"
+
+# ╔═╡ 9437f3b0-9224-11eb-1f20-5ba9384a8f73
+@model function NetworkAtrophyPM(data, problem)
+    σ ~ InverseGamma(2, 3)	
+    a ~ truncated(Normal(0, 2), 0, 10)
+    b ~ truncated(Normal(0, 2), 0, 10)
+	r ~ truncated(Normal(0, 1), 0, 10)
+
+    #u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 166)
+
+    p = [a, b, r]
+
+    prob = remake(problem, p=p)
+    
+    predicted = solve(prob, Tsit5(), saveat=0.5)
+    @threads for i = 1:length(predicted)
+        data[:,i] ~ MvNormal(predicted[i], σ)
+    end
+
+    return a, b, r
+end
+
+# ╔═╡ 76f1dea6-9242-11eb-37a8-350ddacaadf5
+data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0);
+
+# ╔═╡ 34389c9a-9243-11eb-2979-4b1807ffdce5
+@time sample(NetworkAtrophyPM(data,prob), Prior(), 1)
 
 # ╔═╡ Cell order:
 # ╟─b442e1b4-920c-11eb-0a77-411787683d43
-# ╠═8bc35944-920c-11eb-1db3-052983e3b30b
 # ╠═dadc259e-9214-11eb-2b38-33b4cdb9e26b
 # ╟─04360dc6-920e-11eb-3450-ff37ab783adc
 # ╠═432a42e4-920f-11eb-1d98-87b08b70318d
@@ -109,7 +220,16 @@ md"Now we have an adjacency matrix and a Laplacian matrix!"
 # ╠═cbae4f5c-9214-11eb-0807-cd37295f37ba
 # ╠═f54ae6e0-9214-11eb-2baa-fba9babd502e
 # ╠═1e560938-9216-11eb-15fa-4d0e02bff32d
-# ╠═75684bec-9215-11eb-2c7a-1be0d062b441
 # ╠═7c9b1dfe-9217-11eb-068b-d17b2a1192aa
 # ╠═a79f01a8-9217-11eb-2466-79e51dd4fd98
 # ╟─05e312f6-9216-11eb-2a63-31aa25bbdd62
+# ╟─262a69b8-921d-11eb-30dd-b3f8bcbabeef
+# ╠═06f74d20-921f-11eb-3911-e774241dcbd5
+# ╟─537c2a70-9220-11eb-1991-079d887c9277
+# ╠═5ef83788-9228-11eb-32fe-8b092a2e7f90
+# ╠═60eb89f0-921e-11eb-2978-1f90d4769c1f
+# ╠═20b51026-921f-11eb-2fd0-8f7b3dbd8069
+# ╟─31212946-9223-11eb-0593-87378deb5fc4
+# ╠═9437f3b0-9224-11eb-1f20-5ba9384a8f73
+# ╠═76f1dea6-9242-11eb-37a8-350ddacaadf5
+# ╠═34389c9a-9243-11eb-2979-4b1807ffdce5

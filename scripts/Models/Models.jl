@@ -46,12 +46,36 @@ end
     return r, a, b, u
 end
 
+
+
 function plot_predictive(chain_array, prob, sol, data, node::Int)
     plot(Array(sol)[node,:], w=2, legend = false)
     for k in 1:300
-        par = chain_array[rand(1:1_000), 1:23]
-        resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
+        par = chain_array[rand(1:1_000), 1:13]
+        resol = solve(remake(prob,u0=par[4:13], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
         plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
     end
     scatter!(data[node,:], legend = false)
+end
+
+@model function NetworkAtrophyOnly(data, problem, ::Type{T} = Float64) where {T} 
+    n = Int(size(data)[1])
+
+    σ ~ InverseGamma(2, 3)
+    r ~ truncated(Normal(0, 1), 0, Inf)
+    a ~ truncated(Normal(0, 2), 0, Inf)
+    b ~ truncated(Normal(0, 2), 0, Inf)
+
+    u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 2n)
+
+    p = [r, a, b]
+
+    prob = remake(problem, u0=u, p=p)
+    
+    predicted = solve(prob, Tsit5(), saveat=0.1)
+    @threads for i = 1:length(predicted)
+        data[:,i] ~ MvNormal(predicted[n+1:end,i], σ)
+    end
+
+    return r, a, b, u
 end
