@@ -1,4 +1,5 @@
 using Plots, MCMCChains
+using DelimitedFiles
 
 function plot_predictive(chain_array, prob, sol, data, node::Int)
     plot(Array(sol)[node,:], w=2, legend = false)
@@ -8,4 +9,10 @@ function plot_predictive(chain_array, prob, sol, data, node::Int)
         plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
     end
     scatter!(data[node,:], legend = false)
+end
+
+plot_connectome(coords, alpha)
+    coords = readdlm(coord_path)
+    x, y, z = coords[:,1], coords[:,2], coords[:,3]
+    return scatter(x, y, z, grid=false, showaxis = false, markersize=10, markeralpha=alpha)
 end
