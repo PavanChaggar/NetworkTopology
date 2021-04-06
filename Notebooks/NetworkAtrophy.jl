@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.0
 
 using Markdown
 using InteractiveUtils
@@ -26,8 +26,15 @@ begin
 	using Plots
 	using PlutoUI
 	using Base.Threads
+	using LinearAlgebra
 	Turing.setadbackend(:forwarddiff)
 end;
+
+# ╔═╡ 20b75f23-fa3f-440c-8092-4843ed7a5397
+using MCMCChains
+
+# ╔═╡ af9c3535-d247-47a5-a8c3-a80e00af01bf
+include("../scripts/Models/Models.jl");
 
 # ╔═╡ b442e1b4-920c-11eb-0a77-411787683d43
 md"# Network FKPP & Atrophy
@@ -49,19 +56,21 @@ $A_{i,j} = \frac{n_{i,j}}{l_{i,j}^2}$
 However, options can be provided to switch the weighting of the network." 
 
 # ╔═╡ 432a42e4-920f-11eb-1d98-87b08b70318d
-begin
+#=begin
 	# Functions to Load graph
 	
 	read_subjects(csv_path::String) = Int.(readdlm(csv_path))
 	
-	function norm_adjacency(file::String)
-		A = sparse(readdlm(file))
-		symA = 0.5 * (A + A')
-		norm = symA/maximum(symA)
-		return norm
-	end
+	symmetrise(M) = 0.5 * (M + transpose(M))
+	
+	max_norm(M) = M ./ maximum(M)
+	
+	adjacency_matrix(file::String) = sparse(readdlm(file))
+	
+	laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
 		
-	function mean_connectome(subjects::Array, subject_dir::String, N::Int64, size::Int64; length::Bool)
+	function load_connectome(subjects, subject_dir, N, size; length::Bool)
+		
 		M = Array{Float64}(undef, size, size, N)
 		
 		if length == true
@@ -72,19 +81,20 @@ begin
 		
 		for i ∈ 1:N
 			file = subject_dir * string(subjects[i]) * connectome_type
-			M[:,:,i] = norm_adjacency(file)
+			M[:,:,i] = symmetrise(adjacency_matrix(file))
 		end
 		
-		return mean(M, dims=3)[:,:]
+		return M
 	end
+	
+	mean_connectome(M) = mean(M, dims=3)[:,:]
+
 	
 	function diffusive_weight(An, Al)
 		A = An ./ Al.^2
 		[A[i,i] = 0.0 for i in 1:size(A)[1]]
 		return A
 	end	
-	
-	laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
 	
 	function plot_predictive(chain_array, prob, sol, data, node::Int)
 		plot(Array(sol)[node,:], w=2, legend = false)
@@ -98,8 +108,7 @@ begin
  
 md"##### Some functions are hidden here"
 end
-
-
+=#
 
 # ╔═╡ f92933dc-9211-11eb-091c-11c31d59df21
 csv_path = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/all_subjects"
@@ -111,16 +120,16 @@ subject_dir = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/standard_conn
 subjects = read_subjects(csv_path);
 
 # ╔═╡ f54ae6e0-9214-11eb-2baa-fba9babd502e
-An = mean_connectome(subjects, subject_dir, 100, 83, length=false);
+An = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, length=false));
 
 # ╔═╡ 1e560938-9216-11eb-15fa-4d0e02bff32d
-Al = mean_connectome(subjects, subject_dir, 100, 83, length=true);
+Al = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, length=true));
 
 # ╔═╡ 7c9b1dfe-9217-11eb-068b-d17b2a1192aa
 A = diffusive_weight(An, Al);
 
 # ╔═╡ a79f01a8-9217-11eb-2466-79e51dd4fd98
-const L = laplacian_matrix(A);
+L = max_norm(laplacian_matrix(A));
 
 # ╔═╡ 05e312f6-9216-11eb-2a63-31aa25bbdd62
 md"Now we have an adjacency matrix and a Laplacian matrix and can start to run simulations on networks!"
@@ -142,7 +151,7 @@ function NetworkAtrophyODE(du, u0, p, t; L=L)
 
     x = u0[1:n]
     y = u0[n+1:2n]
-
+	
     α, β, ρ = p
 
     du[1:n] .= -ρ * L * x .+ α .* x .* (1.0 .- x)
@@ -151,9 +160,9 @@ end
 
 # ╔═╡ 537c2a70-9220-11eb-1991-079d887c9277
 md"""
-ρ = $(@bind ρ Slider(0.001:0.001:0.1, show_value=true, default=0.1))
+ρ = $(@bind ρ Slider(0:0.05:3, show_value=true, default=0.1))
 
-α = $(@bind α Slider(0.1:0.1:3, show_value=true, default=1.0))
+α = $(@bind α Slider(0.1:0.1:5, show_value=true, default=1.0))
 
 β = $(@bind β Slider(0.1:0.1:3, show_value=true, default=1.0))
 
@@ -178,6 +187,9 @@ end;
 # ╔═╡ 20b51026-921f-11eb-2fd0-8f7b3dbd8069
 plot(sol, vars=(1:83), legend=false)
 
+# ╔═╡ 6395656d-f336-4087-a2a8-8b5e4d9aadb7
+plot(sol, vars=(84:166), legend=false)
+
 # ╔═╡ 31212946-9223-11eb-0593-87378deb5fc4
 md"## Inference
 
@@ -186,8 +198,8 @@ Now that we have the ODE set up and we can write a probablist model for this usi
 # ╔═╡ 9437f3b0-9224-11eb-1f20-5ba9384a8f73
 @model function NetworkAtrophyPM(data, problem)
     σ ~ InverseGamma(2, 3)	
-    a ~ truncated(Normal(0, 2), 0, 10)
-    b ~ truncated(Normal(0, 2), 0, 10)
+    a ~ truncated(Normal(1, 3), 0, 10)
+    b ~ truncated(Normal(1, 5), 0, 10)
 	r ~ truncated(Normal(0, 1), 0, 10)
 
     #u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 166)
@@ -205,14 +217,70 @@ Now that we have the ODE set up and we can write a probablist model for this usi
 end
 
 # ╔═╡ 76f1dea6-9242-11eb-37a8-350ddacaadf5
-data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0);
+#data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0);
+
+# ╔═╡ 4d49615b-4ac4-4edf-8f05-975966f8559a
+data = Array(sol);
 
 # ╔═╡ 34389c9a-9243-11eb-2979-4b1807ffdce5
-@time sample(NetworkAtrophyPM(data,prob), Prior(), 1)
+model = NetworkAtrophyPM(data,prob);
+
+# ╔═╡ 20164994-b115-49c4-8763-2886b121c4d3
+prior_chain = sample(model, Prior(), 1_000);
+
+# ╔═╡ c2942b0e-f9ba-47c4-b68e-ff6f64b0a22d
+function plot_predictivenew(chain_array, prob, sol, data, node::Int)
+    plot(Array(sol)[node,:], w=2, legend = false)
+    for k in 1:300
+        par = chain_array[rand(1:1_000), 1:4]
+        resol = solve(remake(prob, p=[par[1],par[2],par[3]]),Tsit5(),saveat=0.5)
+        plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
+    end
+    scatter!(data[node,:], legend = false)
+end
+
+# ╔═╡ e4ae1a45-05c5-435a-9a76-8fb9cd9a5a71
+plot_predictivenew(Array(prior_chain), prob, sol, data, 5)
+
+# ╔═╡ c9def5db-293f-4f7c-8a3f-c2d86e52c882
+chain = sample(model, NUTS(0.65), 1_000, progress=true);
+
+# ╔═╡ 6517f6d6-2f80-48ff-9138-1890b04f645e
+plot(chain)
+
+# ╔═╡ 99c2e529-bf25-47a4-857e-ef03a156a19a
+@model function NetworkAtrophyOnlyPM(data, problem)
+	n = Int(size(data)[1])
+
+    σ ~ InverseGamma(2, 3)	
+    a ~ truncated(Normal(1, 3), 0, 10)
+    b ~ truncated(Normal(1, 5), 0, 10)
+	r ~ truncated(Normal(0, 1), 0, 10)
+
+    #u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 166)
+
+    p = [a, b, r]
+
+    prob = remake(problem, p=p)
+    
+    predicted = solve(prob, Tsit5(), saveat=0.5)
+    @threads for i = 1:length(predicted)
+        data[:,i] ~ MvNormal(predicted[n+1:end,i], σ)
+    end
+
+    return a, b, r
+end
+
+# ╔═╡ 30a4495d-a87d-4dc1-bd60-d0ae3dfd3159
+atrophy_model = NetworkAtrophyOnlyPM(data,prob);
+
+# ╔═╡ d0ca10c0-8d6c-4c9d-92d6-98fb48e710a6
+@time sample(atrophy_model, Prior(), 1);
 
 # ╔═╡ Cell order:
 # ╟─b442e1b4-920c-11eb-0a77-411787683d43
 # ╠═dadc259e-9214-11eb-2b38-33b4cdb9e26b
+# ╠═af9c3535-d247-47a5-a8c3-a80e00af01bf
 # ╟─04360dc6-920e-11eb-3450-ff37ab783adc
 # ╠═432a42e4-920f-11eb-1d98-87b08b70318d
 # ╠═f92933dc-9211-11eb-091c-11c31d59df21
@@ -225,11 +293,22 @@ data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0);
 # ╟─05e312f6-9216-11eb-2a63-31aa25bbdd62
 # ╟─262a69b8-921d-11eb-30dd-b3f8bcbabeef
 # ╠═06f74d20-921f-11eb-3911-e774241dcbd5
-# ╟─537c2a70-9220-11eb-1991-079d887c9277
+# ╠═537c2a70-9220-11eb-1991-079d887c9277
 # ╠═5ef83788-9228-11eb-32fe-8b092a2e7f90
 # ╠═60eb89f0-921e-11eb-2978-1f90d4769c1f
 # ╠═20b51026-921f-11eb-2fd0-8f7b3dbd8069
+# ╠═6395656d-f336-4087-a2a8-8b5e4d9aadb7
 # ╟─31212946-9223-11eb-0593-87378deb5fc4
 # ╠═9437f3b0-9224-11eb-1f20-5ba9384a8f73
 # ╠═76f1dea6-9242-11eb-37a8-350ddacaadf5
+# ╠═4d49615b-4ac4-4edf-8f05-975966f8559a
 # ╠═34389c9a-9243-11eb-2979-4b1807ffdce5
+# ╠═20164994-b115-49c4-8763-2886b121c4d3
+# ╠═20b75f23-fa3f-440c-8092-4843ed7a5397
+# ╠═c2942b0e-f9ba-47c4-b68e-ff6f64b0a22d
+# ╠═e4ae1a45-05c5-435a-9a76-8fb9cd9a5a71
+# ╠═c9def5db-293f-4f7c-8a3f-c2d86e52c882
+# ╠═6517f6d6-2f80-48ff-9138-1890b04f645e
+# ╠═99c2e529-bf25-47a4-857e-ef03a156a19a
+# ╠═30a4495d-a87d-4dc1-bd60-d0ae3dfd3159
+# ╠═d0ca10c0-8d6c-4c9d-92d6-98fb48e710a6

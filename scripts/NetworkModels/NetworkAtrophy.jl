@@ -1,128 +1,94 @@
-using DifferentialEquations, LightGraphs, Plots, Turing
+using DelimitedFiles
+using SparseArrays
+using Statistics
 using SimpleWeightedGraphs
-using LinearAlgebra
+using LightGraphs
+using DifferentialEquations
+using Turing
+using Plots
 using Base.Threads
 Turing.setadbackend(:forwarddiff)
 
-gr()
+include("../Models/Models.jl")
 
-#G = erdos_renyi(10, 0.5)
-#GW = SimpleWeightedGraph(G)
-#for e in edges(GW)
-#    add_edge!(GW, src(e), dst(e), rand())
-#end
+csv_path = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/all_subjects"
+subject_dir = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/standard_connectome/scale1/subjects/"
+subjects = read_subjects(csv_path);
 
-function MakeSimpleWeightedGraph(n::Int64, p::Float64)
-    GW = SimpleWeightedGraph(erdos_renyi(n, p))
-    for e in edges(GW)
-        add_edge!(GW, src(e), dst(e), rand())
-    end
-    return GW
-end
+An = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, false));
+Al = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, true));
 
-GW = MakeSimpleWeightedGraph(10,0.5)
+A = diffusive_weight(An, Al);
+L = max_norm(laplacian_matrix(A));
 
-L = laplacian_matrix(GW)
+function NetworkAtrophyODE(du, u0, p, t; L=L)
+    n = Int(length(u0)/2)
 
-heatmap(Array(adjacency_matrix(GW)))
-heatmap(Array(L))
-
-function NetworkAtrophy(du, u, p, t; L=L)
-    n = Int(length(u)/2)
-
-    x = u[1:n]
-    y = u[n+1:2n]
-
-    ρ, α, β = p
+    x = u0[1:n]
+    y = u0[n+1:2n]
+	
+    α, β, ρ = p
 
     du[1:n] .= -ρ * L * x .+ α .* x .* (1.0 .- x)
     du[n+1:2n] .= β * x .* (1.0 .- y)
 end
 
-p = [0.1, 2.0, 1.0]
+@model function NetworkAtrophyPM(data, problem)
+    σ ~ InverseGamma(2, 3)	
+    a ~ truncated(Normal(1, 3), 0, 10)
+    b ~ truncated(Normal(1, 5), 0, 10)
+	r ~ truncated(Normal(0, 1), 0, 10)
 
-protein = zeros(10) 
-protein[rand(1:10)] = 0.1
+    #u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 166)
 
-u0 = [protein; zeros(10)]
-t_span = (0.0,10.0)
-prob = ODEProblem(NetworkAtrophy, u0, t_span, p)
+    p = [a, b, r]
 
-sol = solve(prob, Tsit5(), saveat=0.1)
-#data = Array(sol)
-data = clamp.(Array(sol) + 0.02 * randn(size(Array(sol))), 0.0,1.0)
+    prob = remake(problem, p=p)
+    
+    predicted = solve(prob, Tsit5(), saveat=0.5)
+    @threads for i = 1:length(predicted)
+        data[:,i] ~ MvNormal(predicted[i], σ)
+    end
 
-plot(sol, vars=(1:10))
-scatter!(0:0.1:10,data[1:10,:]')
+    return a, b, r
+end
 
-plot(sol, vars=(11:20))
-scatter!(0:0.1:10,data[11:20,:]')
+@model function NetworkAtrophyOnly(data, problem, ::Type{T} = Float64) where {T} 
+    n = Int(size(data)[1])
 
-@model function NetworkAtrophy(data, problem)
     σ ~ InverseGamma(2, 3)
     r ~ truncated(Normal(0, 1), 0, Inf)
     a ~ truncated(Normal(0, 2), 0, Inf)
     b ~ truncated(Normal(0, 2), 0, Inf)
 
-    u ~ filldist(truncated(Normal(0, 0.1), 0, 1), 20)
-
     p = [r, a, b]
 
-    prob = remake(problem, u0=u, p=p)
+    prob = remake(problem, p=p)
     
     predicted = solve(prob, Tsit5(), saveat=0.1)
     @threads for i = 1:length(predicted)
-        data[:,i] ~ MvNormal(predicted[i], σ)
+        data[:,i] ~ MvNormal(predicted[n+1:end,i], σ)
     end
 
-    return r, a, b, u
+    return r, a, b
 end
 
+p = [2.5, 1.0, 0.3]
+protein = zeros(83)
+protein[[27,68]] .= 0.1;
+u0 = [protein; zeros(83)];
+t_span = (0.0, 10.0);
 
-# Prior predictive model
-prior_chain = sample(NetworkAtrophy(data,prob), Prior(), 10_000)
+problem = ODEProblem(NetworkAtrophyODE, u0, t_span, p)
+sol = solve(problem, Tsit5(), saveat=0.1)
 
-chain_array = Array(prior_chain)
+data = Array(sol)
+atrophy_data = data[84:end,:]
 
-plot(Array(sol)[10,:], w=1, legend = false)
-for k in 1:500
-    par = chain_array[rand(1:10_000), 1:23]
-    resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
-    plot!(Array(resol)[10,:], alpha=0.5, color = "#BBBBBB", legend = false)
-end
-scatter!(data[10,:], legend = false)
+model = NetworkAtrophyPM(data,problem)
 
-# Posterior sampling
-model = NetworkAtrophy(data,prob)
+@time sample(model, Prior(), 1)
 
-#chain = sample(model, NUTS(0.65), MCMCThreads(), 1_000, 10, progress=true)
+model = NetworkAtrophyOnly(atrophy_data, problem)
 
-chain = sample(model, NUTS(0.65), 1_000)
-
-chain_array = Array(chain)
-
-avg = mean(chain_array, dims=1)
-
-noden = 5
-plot(Array(sol)[noden,:], w=1, legend = false)
-for k in 1:100
-    par = chain_array[rand(1:500), 1:23]
-    resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.1)
-    plot!(Array(resol)[noden,:], alpha=0.5, color = "#BBBBBB", legend = false)
-end
-scatter!(data[noden,:], legend = false)
-
-using StatsPlots, MCMCChains
-plot(chain)
-
-function plot_predictive(chain_array, sol, data, node::Int)
-    plot(Array(sol)[node,:], w=2, legend = false)
-    for k in 1:100
-        par = chain_array[rand(1:500), 1:23]
-        resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),AutoTsit5(Rosenbrock23()),saveat=0.1)
-        plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
-    end
-    scatter!(data[node,:], legend = false)
-end
-
-plot_predictive(chain_array, sol, data, 10)
+prior_chain = sample(model, Prior(), 1_000)

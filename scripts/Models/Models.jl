@@ -1,4 +1,4 @@
-using DifferentialEquations, LightGraphs, Plots, SimpleWeightedGraphs, LinearAlgebra, Turing, Base.Threads
+using DifferentialEquations, LightGraphs, Plots, SimpleWeightedGraphs, LinearAlgebra, Turing, Base.Threads, MCMCChains
 Turing.setadbackend(:forwarddiff)
 
 """
@@ -78,4 +78,50 @@ end
     end
 
     return r, a, b, u
+end
+
+read_subjects(csv_path::String) = Int.(readdlm(csv_path))
+	
+symmetrise(M) = 0.5 * (M + transpose(M))
+
+max_norm(M) = M ./ maximum(M)
+
+adjacency_matrix(file::String) = sparse(readdlm(file))
+
+laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
+    
+function load_connectome(subjects, subject_dir, N, size, length)
+    
+    M = Array{Float64}(undef, size, size, N)
+    
+    if length == true
+        connectome_type = "/fdt_network_matrix_lengths"
+    else
+        connectome_type = "/fdt_network_matrix"
+    end
+    
+    for i ∈ 1:N
+        file = subject_dir * string(subjects[i]) * connectome_type
+        M[:,:,i] = symmetrise(adjacency_matrix(file))
+    end
+    
+    return M
+end
+
+mean_connectome(M) = mean(M, dims=3)[:,:]
+
+function diffusive_weight(An, Al)
+    A = An ./ Al.^2
+    [A[i,i] = 0.0 for i in 1:size(A)[1]]
+    return A
+end	
+
+function plot_predictive(chain_array, prob, sol, data, node::Int)
+    plot(Array(sol)[node,:], w=2, legend = false)
+    for k in 1:300
+        par = chain_array[rand(1:1_000), 1:23]
+        resol = solve(remake(prob,u0=par[4:23], p=[par[3],par[1],par[2]]),Tsit5(),saveat=0.1)
+        plot!(Array(resol)[node,:], alpha=0.5, color = "#BBBBBB", legend = false)
+    end
+    scatter!(data[node,:], legend = false)
 end
