@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.14.0
+# v0.14.1
 
 using Markdown
 using InteractiveUtils
@@ -28,13 +28,23 @@ begin
 	using Base.Threads
 	using LinearAlgebra
 	Turing.setadbackend(:forwarddiff)
+	gr()
 end;
 
 # ╔═╡ 20b75f23-fa3f-440c-8092-4843ed7a5397
-using MCMCChains
+begin
+	using MCMCChains
+	using StatsPlots
+end
+
+# ╔═╡ 77e34aac-b734-49b1-8041-ee42d5139fa1
+using Serialization
 
 # ╔═╡ af9c3535-d247-47a5-a8c3-a80e00af01bf
-include("../scripts/Models/Models.jl");
+begin
+	include("../scripts/Models/Models.jl");
+	include("../scripts/Models/Matrices.jl");
+end
 
 # ╔═╡ b442e1b4-920c-11eb-0a77-411787683d43
 md"# Network FKPP & Atrophy
@@ -120,10 +130,10 @@ subject_dir = "/scratch/oxmbm-shared/Code-Repositories/Connectomes/standard_conn
 subjects = read_subjects(csv_path);
 
 # ╔═╡ f54ae6e0-9214-11eb-2baa-fba9babd502e
-An = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, length=false));
+An = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, false));
 
 # ╔═╡ 1e560938-9216-11eb-15fa-4d0e02bff32d
-Al = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, length=true));
+Al = mean_connectome(load_connectome(subjects, subject_dir, 100, 83, true));
 
 # ╔═╡ 7c9b1dfe-9217-11eb-068b-d17b2a1192aa
 A = diffusive_weight(An, Al);
@@ -243,10 +253,16 @@ end
 plot_predictivenew(Array(prior_chain), prob, sol, data, 5)
 
 # ╔═╡ c9def5db-293f-4f7c-8a3f-c2d86e52c882
-chain = sample(model, NUTS(0.65), 1_000, progress=true);
+chain = sample(model, NUTS(0.65), 1_000)
 
 # ╔═╡ 6517f6d6-2f80-48ff-9138-1890b04f645e
 plot(chain)
+
+# ╔═╡ ce419582-35c0-45a7-9e21-c8d145c25805
+serialize("/home/chaggar/Projects/NetworkTopology/Chains/NetworkFKPPAtrophyChain.jls", chain)
+
+# ╔═╡ 6e06d987-7f3d-468a-b5af-1f89343a92cd
+atrophy_data = data[84:end, :]
 
 # ╔═╡ 99c2e529-bf25-47a4-857e-ef03a156a19a
 @model function NetworkAtrophyOnlyPM(data, problem)
@@ -272,10 +288,19 @@ plot(chain)
 end
 
 # ╔═╡ 30a4495d-a87d-4dc1-bd60-d0ae3dfd3159
-atrophy_model = NetworkAtrophyOnlyPM(data,prob);
+atrophy_model = NetworkAtrophyOnlyPM(atrophy_data,prob);
 
 # ╔═╡ d0ca10c0-8d6c-4c9d-92d6-98fb48e710a6
-@time sample(atrophy_model, Prior(), 1);
+atrophy_prior_chain = sample(atrophy_model, Prior(), 1_000);
+
+# ╔═╡ 7be0dd16-f367-439a-99af-a0da44208fd8
+atrophy_chain = sample(atrophy_model, NUTS(0.65), 1_000)
+
+# ╔═╡ 84410e38-889a-422e-829f-8d97df1ca274
+plot(atrophy_chain)
+
+# ╔═╡ d5801d27-5257-4de3-9465-a21986723d79
+serialize("/home/chaggar/Projects/NetworkTopology/Chains/NetworkAtrophyChain2.jls", atrophy_chain)
 
 # ╔═╡ Cell order:
 # ╟─b442e1b4-920c-11eb-0a77-411787683d43
@@ -293,7 +318,7 @@ atrophy_model = NetworkAtrophyOnlyPM(data,prob);
 # ╟─05e312f6-9216-11eb-2a63-31aa25bbdd62
 # ╟─262a69b8-921d-11eb-30dd-b3f8bcbabeef
 # ╠═06f74d20-921f-11eb-3911-e774241dcbd5
-# ╠═537c2a70-9220-11eb-1991-079d887c9277
+# ╟─537c2a70-9220-11eb-1991-079d887c9277
 # ╠═5ef83788-9228-11eb-32fe-8b092a2e7f90
 # ╠═60eb89f0-921e-11eb-2978-1f90d4769c1f
 # ╠═20b51026-921f-11eb-2fd0-8f7b3dbd8069
@@ -309,6 +334,12 @@ atrophy_model = NetworkAtrophyOnlyPM(data,prob);
 # ╠═e4ae1a45-05c5-435a-9a76-8fb9cd9a5a71
 # ╠═c9def5db-293f-4f7c-8a3f-c2d86e52c882
 # ╠═6517f6d6-2f80-48ff-9138-1890b04f645e
+# ╠═77e34aac-b734-49b1-8041-ee42d5139fa1
+# ╠═ce419582-35c0-45a7-9e21-c8d145c25805
+# ╠═6e06d987-7f3d-468a-b5af-1f89343a92cd
 # ╠═99c2e529-bf25-47a4-857e-ef03a156a19a
 # ╠═30a4495d-a87d-4dc1-bd60-d0ae3dfd3159
 # ╠═d0ca10c0-8d6c-4c9d-92d6-98fb48e710a6
+# ╠═7be0dd16-f367-439a-99af-a0da44208fd8
+# ╠═84410e38-889a-422e-829f-8d97df1ca274
+# ╠═d5801d27-5257-4de3-9465-a21986723d79
