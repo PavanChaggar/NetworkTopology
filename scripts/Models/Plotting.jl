@@ -11,8 +11,18 @@ function plot_predictive(chain_array, prob, sol, data, node::Int)
     scatter!(data[node,:], legend = false)
 end
 
-plot_connectome(coords, alpha)
+function plot_connectome(coord_path, size, alpha)
     coords = readdlm(coord_path)
     x, y, z = coords[:,1], coords[:,2], coords[:,3]
-    return scatter(x, y, z, grid=false, showaxis = false, markersize=10, markeralpha=alpha)
+    scatter(x, y, z, grid=false, showaxis=false, markersize=size, markeralpha=alpha)
+end
+
+function plot_connectome(coord_path, A, size, alpha)
+    fig = plot_connectome(coord_path, size, alpha)
+    coordindex = findall(x->x>0, A)
+    for i ∈ 1:length(coordindex)
+        j, k = coordindex[i][1], coordindex[i][2]
+        plot!(fig, x[[j,k]], y[[j,k]], z[[j,k]], primary=false)
+    end
+    display(fig)
 end

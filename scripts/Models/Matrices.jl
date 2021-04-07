@@ -1,5 +1,6 @@
 using SimpleWeightedGraphs
-
+using SparseArrays
+using Statistics
 """
     MakeSimpleWeightedGraph(n, p)
 
