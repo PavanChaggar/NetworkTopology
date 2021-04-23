@@ -1,6 +1,10 @@
 using SimpleWeightedGraphs
+using LightGraphs
 using SparseArrays
 using Statistics
+using DelimitedFiles
+import LightGraphs.LinAlg.laplacian_matrix
+
 """
     MakeSimpleWeightedGraph(n, p)
 
@@ -26,6 +30,8 @@ laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(Si
 
 mean_connectome(M) = mean(M, dims=3)[:,:]
 
+filter(A, cutoff) = A .* (A .> cutoff)
+
 function load_connectome(subjects, subject_dir, N, size, length)
     
     M = Array{Float64}(undef, size, size, N)
@@ -49,3 +55,18 @@ function diffusive_weight(An, Al)
     [A[i,i] = 0.0 for i in 1:size(A)[1]]
     return A
 end	
+
+#=
+laplacian_matrix(A::Array{Float64,2}) = laplacian_matrix(SimpleWeightedGraph(A))
+
+connectome_dir = "/home/chaggar/Projects/Connectomes/"
+csv_path = connectome_dir * "all_subjects"
+subject_dir = connectome_dir * "standard_connectome/scale1/subjects/"
+subjects = read_subjects(csv_path);
+A_all = load_connectome(subjects, subject_dir, 100, 83, false);
+A = max_norm(mean_connectome(A_all))
+
+laplacian_matrix(SimpleWeightedGraph(A))
+
+laplacian_matrix(A)
+=#
