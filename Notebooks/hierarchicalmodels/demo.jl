@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.14.1
+# v0.14.5
 
 using Markdown
 using InteractiveUtils
@@ -80,6 +80,10 @@ MvNormal(data[:,1], 0)
 	end
 end	
 
+# ╔═╡ 29901ca7-02d3-4e10-9cc0-fcb49caa8b81
+md"
+$y_i \approx \mathcal{N}(\alpha_i, \sigma)$"
+
 # ╔═╡ cc394908-66cf-4500-8666-6f64df9102e3
 chain = sample(fit(data), NUTS(0.65), 1000)
 
@@ -100,5 +104,6 @@ describe(chain)
 # ╠═56dc877e-aba8-4f5f-b4d1-64991c2baa1b
 # ╠═80039d50-60fd-421d-a55e-9408c9403c4d
 # ╠═a4d096d0-55d9-4e3d-8155-aee1dcdf01a6
+# ╠═29901ca7-02d3-4e10-9cc0-fcb49caa8b81
 # ╠═cc394908-66cf-4500-8666-6f64df9102e3
 # ╠═b3b8e1b2-67d7-4f65-9590-b44e230b2a12

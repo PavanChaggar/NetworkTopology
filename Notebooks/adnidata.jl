@@ -40,7 +40,7 @@ First thing we need to do is to load in the data as a DataFrame so that it's eas
 root_dir = dirname(pwd())
 
 # ╔═╡ 601d12de-c9cf-4ba5-893b-9730866af309
-data_file = root_dir * "/data/UCBERKELEYAV1451_01_14_21.csv"
+data_file = root_dir * "/data/UCBERKELEYAV1451_PVC_01_15_21.csv"
 
 # ╔═╡ 565d7c0d-d60b-428b-9f83-bdbc20299f62
 RIDDict = deserialize(root_dir * "/data/dicts/RIDDict")
@@ -67,8 +67,8 @@ function MakeParcellationDict(parcellation_file)
 	return Dict(zip(parc.index, names))
 end
 
-# ╔═╡ 651c664f-02bf-4646-bdee-4da1e9f35564
-FSDict = MakeParcellationDict("/Users/pavanchaggar/Projects/NetworkTopology/data/sub-01_label-L2018_desc-scale1_stats.tsv")
+# ╔═╡ 19fcbc9e-b644-4a43-a915-9e66c4bec15e
+FSDict = deserialize(root_dir * "/data/dicts/FSDict")
 
 # ╔═╡ 64247f09-1bee-4913-a2f8-8732fdd56d71
 md" ## Accessing subject data
@@ -89,14 +89,27 @@ end_date = sort(data[:,:EXAMDATE])[end]
 # ╔═╡ 74542b84-a660-495c-b6fc-775de1bcaea4
 md"subject = $(@bind subject Slider(1:1:108, show_value=true, default=10))"
 
-# ╔═╡ 914a642e-dbac-4cce-ab33-cb2ae1c7f880
-md"node = $(@bind node Slider(1:1:83, show_value=true, default=10))"
-
 # ╔═╡ 9d13fa73-947c-4752-99f7-f9949f971ffa
 subject_data = filter(x -> x.RID == subjectsManyNs[subject], data)
 
 # ╔═╡ 445e7e94-e7a2-4ed9-9e57-e28b9bef4df3
-scatter(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK1_SUVR"], ylims=(0,3), xlims=(start_date, end_date))
+begin
+	scatter(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK1_SUVR"], ylims=(0,10), xlims=(start_date, end_date), label="Braak 1")
+	scatter!(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK34_SUVR"], ylims=(0,10), xlims=(start_date, end_date), label="Braak 3/4")
+	scatter!(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK56_SUVR"], ylims=(0,10), xlims=(start_date, end_date), label="Braak 5/6")
+end
+
+# ╔═╡ 6a449da7-d270-470d-86ba-4cbad2b962ac
+dx = DataFrame(CSV.File(root_dir * "/data/DXSUM_PDXCONV_ADNIALL.csv"))
+
+# ╔═╡ fa5c6383-bc7f-49fa-b50e-b1097b2b4d58
+filter(x -> x.RID == true, data)
+
+# ╔═╡ c7fee613-a30f-40f7-8e95-b4b113c474a3
+subjectsManyNs
+
+# ╔═╡ 6bfa1d3b-7cd9-40aa-9b7d-9ae0e42f5bf9
+[subjectsManyNs[i] in ADsubjects for i in 1:length(subjectsManyNs)]
 
 # ╔═╡ Cell order:
 # ╟─8900ad5c-ac19-11eb-2709-6bd4455db463
@@ -109,7 +122,7 @@ scatter(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK1_SUVR"], ylims=(0,3), x
 # ╠═45685366-fc07-4a05-a348-f709c7127327
 # ╟─f67f9d4d-a783-4740-8a6d-ff2365bc8869
 # ╠═f2b4e579-e072-4016-99f3-eb03c0e1b0e0
-# ╠═651c664f-02bf-4646-bdee-4da1e9f35564
+# ╠═19fcbc9e-b644-4a43-a915-9e66c4bec15e
 # ╟─64247f09-1bee-4913-a2f8-8732fdd56d71
 # ╠═19bea830-004c-443e-9416-857d81d81e1e
 # ╠═2914a464-ae24-4707-bb55-912454044e80
@@ -117,6 +130,9 @@ scatter(subject_data[:,:EXAMDATE], subject_data[:,"BRAAK1_SUVR"], ylims=(0,3), x
 # ╠═91e29ec9-9326-49fc-88a4-478093fe2866
 # ╠═cb4bd167-5513-42dc-b1b3-23f5663b1977
 # ╟─74542b84-a660-495c-b6fc-775de1bcaea4
-# ╟─914a642e-dbac-4cce-ab33-cb2ae1c7f880
-# ╠═445e7e94-e7a2-4ed9-9e57-e28b9bef4df3
+# ╟─445e7e94-e7a2-4ed9-9e57-e28b9bef4df3
 # ╠═9d13fa73-947c-4752-99f7-f9949f971ffa
+# ╠═6a449da7-d270-470d-86ba-4cbad2b962ac
+# ╠═fa5c6383-bc7f-49fa-b50e-b1097b2b4d58
+# ╠═c7fee613-a30f-40f7-8e95-b4b113c474a3
+# ╠═6bfa1d3b-7cd9-40aa-9b7d-9ae0e42f5bf9
