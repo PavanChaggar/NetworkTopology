@@ -1,24 +1,24 @@
 using GLMakie
 using DelimitedFiles
 using FileIO
-include("/home/chaggar/Projects/NetworkTopology/scripts/Models/Matrices.jl")
+using SimpleWeightedGraphs
+using LinearAlgebra
+include("../../scripts/Models/Matrices.jl")
 
-coord_file = "/home/chaggar/Projects/Connectomes/standard_connectome/parcellation/parcellation-files/sub-01_label-L2018_desc-scale1_atlas_coordinates.csv"
+root_dir = "/Users/pavanchaggar/Projects/"
+
+coord_file = root_dir * "Connectomes/standard_connectome/parcellation/parcellation-files/sub-01_label-L2018_desc-scale1_atlas_coordinates.csv"
 
 coords = readdlm(coord_file)
 
 x, y, z, = coords[:,1],coords[:,2],coords[:,3]
 
-fspath = "/home/chaggar/Projects/NetworkTopology/Notebooks/connectomes/cortical.obj"
+fspath = root_dir * "NetworkTopology/Notebooks/connectomes/cortical.obj"
 
 fsbrain = load(fspath)
 
-fig = mesh(fsbrain, color=(:grey, 0.1), transparency=true, show_axis=false)
-
-meshscatter!(x, y, z, markersize=3, color=(:black,0.5))
-
-csv_path = "/home/chaggar/Projects/Connectomes/all_subjects"
-subjects_dir = "/home/chaggar/Projects/Connectomes/standard_connectome/scale1/subjects/"
+csv_path = root_dir * "Connectomes/all_subjects"
+subjects_dir = root_dir * "Connectomes/standard_connectome/scale1/subjects/"
 
 subjects = read_subjects(csv_path)
 
@@ -28,13 +28,24 @@ Anorm = max_norm(An)
 
 A = filter(Anorm, 0.1)
 
+D = diag(degree_matrix(SimpleWeightedGraph(A)))
+
 coordindex = findall(x->x>0, A)
+
+fig = mesh(fsbrain, color=(:grey, 0.1), transparency=true, show_axis=false)
+
+meshscatter!(x, y, z, markersize=Array(D)*2, color=(:blue,0.5))
 
 for i ∈ 1:length(coordindex)
     j, k = coordindex[i][1], coordindex[i][2]
     lines!(x[[j,k]], y[[j,k]], z[[j,k]], primary=false)
 end
 
-save("fig.png", fig)
+label = readdlm("/Users/pavanchaggar/Projects/FSLabels/rh/rh.entorhinal.label")
 
+brain = load(root_dir * "NetworkTopology/Notebooks/connectomes/cortical.stl")
 
+mesh(
+    brain,
+    color = [tri[1][2] for tri in brain for i in 1:3],
+)
