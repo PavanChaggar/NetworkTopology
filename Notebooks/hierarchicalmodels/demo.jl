@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.14.5
+# v0.14.3
 
 using Markdown
 using InteractiveUtils
@@ -19,6 +19,9 @@ begin
 	using Plots
 	using PlutoUI
 	using Distributions
+	using BenchmarkTools
+	using StatsPlots
+	using MCMCChains
 end
 
 # ╔═╡ 7447efe8-a3a8-11eb-31ae-1f3d35622c05
@@ -57,9 +60,6 @@ end
 # ╔═╡ 56dc877e-aba8-4f5f-b4d1-64991c2baa1b
 plot(t, data[:,i])
 
-# ╔═╡ 80039d50-60fd-421d-a55e-9408c9403c4d
-MvNormal(data[:,1], 0)
-
 # ╔═╡ a4d096d0-55d9-4e3d-8155-aee1dcdf01a6
 @model function fit(data)
 	T, N = size(data)
@@ -72,23 +72,87 @@ MvNormal(data[:,1], 0)
 	Λm ~ Normal(0,2)
 	Λs ~ truncated(Normal(0,5), 0, Inf)
 	
-	for i ∈ 1:N
-		α ~ truncated(Normal(Am, As), 0, Inf)
-		λ ~ truncated(Normal(Λm, Λs), 0, Inf)
-		predicted = f(α, λ)
+	α ~ filldist(truncated(Normal(Am, As), 0, Inf), N)
+	λ ~ filldist(truncated(Normal(Λm, Λs), 0, Inf), N)
+	
+	for i in 1:N
+		predicted = f(α[i], λ[i])
 		data[:,i] .~ MvNormal(predicted, σ)
 	end
 end	
 
-# ╔═╡ 29901ca7-02d3-4e10-9cc0-fcb49caa8b81
-md"
-$y_i \approx \mathcal{N}(\alpha_i, \sigma)$"
+# ╔═╡ 9176f8b1-108f-4cca-aabf-71362b31e0a6
+@model function fit2(data)
+	T, N = size(data)
+	
+	σ ~ InverseGamma(2, 3)
+	
+	Am ~ Normal(0,10)
+	As ~ truncated(Normal(0,5), 0, Inf)
+	
+	Λm ~ Normal(0,2)
+	Λs ~ truncated(Normal(0,5), 0, Inf)
+	
+	α ~ filldist(truncated(Normal(Am, As), 0, Inf), N)
+	λ ~ filldist(truncated(Normal(Λm, Λs), 0, Inf), N)
+	
+	for i in 1:N
+		predicted = f(α[i], λ[i])
+		data[:,i] ~ MvNormal(predicted, σ)
+	end
+end	
+
+# ╔═╡ 73b682e5-8d32-4f6a-bdee-2d3157b826dd
+@model function fit3(data)
+	T, N = size(data)
+	
+	σ ~ InverseGamma(2, 3)
+	
+	Am ~ Normal(0,10)
+	As ~ truncated(Normal(0,5), 0, Inf)
+	
+	Λm ~ Normal(0,2)
+	Λs ~ truncated(Normal(0,5), 0, Inf)
+	
+	α ~ filldist(truncated(Normal(Am, As), 0, Inf), N)
+	λ ~ filldist(truncated(Normal(Λm, Λs), 0, Inf), N)
+	
+	for i in 1:N
+		predicted = f(α[i], λ[i])
+		Turing.@addlogprob! loglikelihood(MvNormal(predicted, σ), data[:,i])
+	end
+end
+
+
+# ╔═╡ e963f64c-33e4-4cc6-b691-124af48884eb
+Normal.(ones(10),0)
+
+# ╔═╡ 7720f559-ea5e-463a-8c22-a8ebd1e56855
+loglikelihood.(Normal.(data[:,1], 1), data[:,1])
+
+# ╔═╡ 7911ef37-2eb2-4c42-8265-bb2122e5d1a9
+loglikelihood(MvNormal(ones(10), 1), ones(10))
+
+# ╔═╡ 9b8fa843-1276-41c6-8e90-2d0718ec986b
+sample(fit(data), Prior(), 1)
 
 # ╔═╡ cc394908-66cf-4500-8666-6f64df9102e3
-chain = sample(fit(data), NUTS(0.65), 1000)
+chain = sample(fit(data), NUTS(0.65), 2000)
 
-# ╔═╡ b3b8e1b2-67d7-4f65-9590-b44e230b2a12
-describe(chain)
+# ╔═╡ 2e886348-f80a-4871-a6cc-cb94cf231d25
+chain2 = sample(fit2(data), NUTS(0.65), 2000)
+
+# ╔═╡ b234d309-c076-4565-b694-9dd3ceee611b
+chain3 = sample(fit3(data), NUTS(0.65), 2000)
+
+# ╔═╡ e893f8fe-4c2a-43b1-9d1e-794fc6257a00
+plot(chain)
+
+# ╔═╡ 72b42320-ac94-4d37-8dd8-6288688555da
+plot(chain2)
+
+# ╔═╡ 3cc3b35c-a786-4b10-b39b-e28b5ca1581a
+plot(chain3)
 
 # ╔═╡ Cell order:
 # ╟─7447efe8-a3a8-11eb-31ae-1f3d35622c05
@@ -102,8 +166,16 @@ describe(chain)
 # ╠═da2af64c-77ba-4fd0-86d1-b925fe147d78
 # ╠═3136c0fe-7768-43fc-a3ba-03e10f7cd0f3
 # ╠═56dc877e-aba8-4f5f-b4d1-64991c2baa1b
-# ╠═80039d50-60fd-421d-a55e-9408c9403c4d
 # ╠═a4d096d0-55d9-4e3d-8155-aee1dcdf01a6
-# ╠═29901ca7-02d3-4e10-9cc0-fcb49caa8b81
+# ╠═9176f8b1-108f-4cca-aabf-71362b31e0a6
+# ╠═73b682e5-8d32-4f6a-bdee-2d3157b826dd
+# ╠═e963f64c-33e4-4cc6-b691-124af48884eb
+# ╠═7720f559-ea5e-463a-8c22-a8ebd1e56855
+# ╠═7911ef37-2eb2-4c42-8265-bb2122e5d1a9
+# ╠═9b8fa843-1276-41c6-8e90-2d0718ec986b
 # ╠═cc394908-66cf-4500-8666-6f64df9102e3
-# ╠═b3b8e1b2-67d7-4f65-9590-b44e230b2a12
+# ╠═2e886348-f80a-4871-a6cc-cb94cf231d25
+# ╠═b234d309-c076-4565-b694-9dd3ceee611b
+# ╠═e893f8fe-4c2a-43b1-9d1e-794fc6257a00
+# ╠═72b42320-ac94-4d37-8dd8-6288688555da
+# ╠═3cc3b35c-a786-4b10-b39b-e28b5ca1581a
