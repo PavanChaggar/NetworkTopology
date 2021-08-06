@@ -26,7 +26,7 @@ max_norm(M) = M ./ maximum(M)
 
 adjacency_matrix(file::String) = sparse(readdlm(file))
 
-laplacian_matrix(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
+laplacian(A::Array{Float64,2}) = SimpleWeightedGraphs.laplacian_matrix(SimpleWeightedGraph(A))
 
 mean_connectome(M) = mean(M, dims=3)[:,:]
 
